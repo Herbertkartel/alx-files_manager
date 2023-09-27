@@ -1,51 +1,41 @@
 import sha1 from 'sha1';
-import Queue from 'bull';
 import { ObjectId } from 'mongodb';
 import dbClient from '../utils/db';
-import getIdAndKey from '../utils/users';
 
-const userQ = new Queue('userQ');
-
-class UsersController {
-  static async postNew(req, res) {
+export const postNew = async (req, res) => {
+  try {
     const { email, password } = req.body;
 
-    if (!email) return res.status(400).send({ error: 'Missing email' });
-    if (!password) return res.status(400).send({ error: 'Missing password' });
-    const emailExists = await dbClient.users.findOne({ email });
-    if (emailExists) return res.status(400).send({ error: 'Already exist' });
+    if (!email) {
+      res.status(400).json({ error: 'Missing email' });
+      return;
+    }
+    if (!password) {
+      res.status(400).json({ error: 'Missing password' });
+      return;
+    }
 
-    const secPass = sha1(password);
+    let user = await dbClient.findUser({ email });
 
-    const insertStat = await dbClient.users.insertOne({
-      email,
-      password: secPass,
-    });
+    if (user) {
+      res.status(400).json({ error: 'Already exist' });
+      return;
+    }
 
-    const createdUser = {
-      id: insertStat.insertedId,
-      email,
-    };
-
-    await userQ.add({
-      userId: insertStat.insertedId.toString(),
-    });
-
-    return res.status(201).send(createdUser);
+    user = await dbClient.createUser(email, sha1(password));
+    res.status(201).json(user);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: 'Server error' });
   }
+};
 
-  static async getMe(req, res) {
-    const { userId } = await getIdAndKey(req);
-
-    const user = await dbClient.users.findOne({ _id: ObjectId(userId) });
-    if (!user) return res.status(401).send({ error: 'Unauthorized' });
-
-    const userInfo = { id: user._id, ...user };
-    delete userInfo._id;
-    delete userInfo.password;
-
-    return res.status(200).send(userInfo);
+export const getMe = async (req, res) => {
+  try {
+    const user = await dbClient.findUser({ _id: ObjectId(req.user.id) });
+    res.status(200).json({ email: user.email, id: user._id });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: 'Server error' });
   }
-}
-
-export default UsersController;
+};

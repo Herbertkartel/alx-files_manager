@@ -1,60 +1,36 @@
 import express from 'express';
-import AppController from '../controllers/AppController';
-import AuthController from '../controllers/AuthController';
-import FilesController from '../controllers/FilesController';
-import UsersController from '../controllers/UsersController';
+import auth from '../utils/auth';
+import { getStatus, getStats } from '../controllers/AppController';
+import { postNew, getMe } from '../controllers/UsersController';
+import { getConnect, getDisconnect } from '../controllers/AuthController';
+import { postUpload } from '../controllers/FilesController';
 
-function controllerRouting(app) {
-  const router = express.Router();
-  app.use('/', router);
+const router = express.Router();
 
-  router.get('/status', (req, res) => {
-    AppController.getStatus(req, res);
-  });
+// AppController routes
 
-  router.get('/stats', (req, res) => {
-    AppController.getStats(req, res);
-  });
+// returns true if Redis is alive and if the DB is alive too
+router.get('/status', getStatus);
+// returns the number of users and files in DB
+router.get('/stats', getStats);
 
-  router.post('/users', (req, res) => {
-    UsersController.postNew(req, res);
-  });
+// UsersController routes
 
-  router.get('/connect', (req, res) => {
-    AuthController.getConnect(req, res);
-  });
+// creates a new user
+router.post('/users', postNew);
+// retrieves the user based on the token used
+router.get('/users/me', auth, getMe);
 
-  router.get('/disconnect', (req, res) => {
-    AuthController.getDisconnect(req, res);
-  });
+// AuthController routes
 
-  router.get('/users/me', (req, res) => {
-    UsersController.getMe(req, res);
-  });
+// sign-in the user by generating a new authentication token
+router.get('/connect', getConnect);
+// sign-out the user based on the token
+router.get('/disconnect', auth, getDisconnect);
 
-  router.post('/files', (req, res) => {
-    FilesController.postUpload(req, res);
-  });
+// FilesController routs
 
-  router.get('/files/:id', (req, res) => {
-    FilesController.getShow(req, res);
-  });
+// creates a new file in the db and in disk
+router.post('/files', auth, postUpload);
 
-  router.get('/files', (req, res) => {
-    FilesController.getIndex(req, res);
-  });
-
-  router.put('/files/:id/publish', (req, res) => {
-    FilesController.putPublish(req, res);
-  });
-
-  router.put('/files/:id/unpublish', (req, res) => {
-    FilesController.putUnpublish(req, res);
-  });
-
-  router.get('/files/:id/data', (req, res) => {
-    FilesController.getFile(req, res);
-  });
-}
-
-export default controllerRouting;
+export default router;
